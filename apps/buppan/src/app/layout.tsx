@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
+import Script from "next/script";
 import { Providers } from "@/components/providers";
 import "./globals.css";
 
@@ -19,6 +20,11 @@ export default function RootLayout({
     <html lang="ja">
       <body className={inter.className}>
         <Providers>{children}</Providers>
+        <Script
+          src="https://app.protechidchecker.com/apps/org7834"
+          strategy="afterInteractive"
+          charSet="utf-8"
+        />
       </body>
     </html>
   );
