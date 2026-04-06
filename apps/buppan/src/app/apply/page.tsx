@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -239,7 +239,9 @@ function FileUpload({
 
 export default function ApplyPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [currentStep, setCurrentStep] = useState(1);
+  const [kycCompleted, setKycCompleted] = useState(false);
   const [plans, setPlans] = useState<Plan[]>([]);
   const [loadingPlans, setLoadingPlans] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -311,6 +313,21 @@ export default function ApplyPage() {
     companyAddress: "",
     companyBuilding: "",
   });
+
+  // URLクエリパラメータでPIC完了後のリダイレクトを処理
+  useEffect(() => {
+    const stepParam = searchParams.get("step");
+    const kycParam = searchParams.get("kyc");
+    if (stepParam) {
+      const stepNum = parseInt(stepParam, 10);
+      if (stepNum >= 1 && stepNum <= 5) {
+        setCurrentStep(stepNum);
+      }
+    }
+    if (kycParam === "complete") {
+      setKycCompleted(true);
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     fetchPlans();
@@ -1158,116 +1175,77 @@ export default function ApplyPage() {
         {currentStep === 3 && (
           <Card>
             <CardHeader>
-              <CardTitle>本人確認書類</CardTitle>
+              <CardTitle>本人確認</CardTitle>
               <CardDescription>
                 {customerType === "INDIVIDUAL"
-                  ? "運転免許証の表面・裏面をアップロードしてください"
-                  : "登記簿謄本と代表者の身分証明書をアップロードしてください"}
+                  ? "本人確認を行います。カメラで身分証と顔写真を撮影してください。"
+                  : "代表者の本人確認と、登記簿謄本のアップロードを行ってください。"}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-              {customerType === "INDIVIDUAL" ? (
-                <div className="space-y-4">
-                  <h4 className="font-medium">運転免許証</h4>
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    <FileUpload
-                      label="免許証（表面）"
-                      uploadedFile={idFront}
-                      onFileChange={setIdFront}
-                      fileType="id_front"
-                      required
-                    />
-                    <FileUpload
-                      label="免許証（裏面）"
-                      uploadedFile={idBack}
-                      onFileChange={setIdBack}
-                      fileType="id_back"
-                      required
-                    />
+              {/* PIC eKYC 本人確認 */}
+              {kycCompleted ? (
+                <div className="p-4 bg-green-50 border border-green-200 rounded-lg flex items-center gap-3">
+                  <Check className="h-5 w-5 text-green-600" />
+                  <div>
+                    <p className="font-medium text-green-800">本人確認が完了しました</p>
+                    <p className="text-sm text-green-700 mt-1">
+                      eKYCによる本人確認が正常に完了しました。次のステップに進んでください。
+                    </p>
                   </div>
                 </div>
               ) : (
-                <div className="space-y-6">
-                  <div className="space-y-4">
-                    <h4 className="font-medium">法人確認書類</h4>
-                    <FileUpload
-                      label="登記簿謄本（履歴事項全部証明書）"
-                      uploadedFile={corporateRegistry}
-                      onFileChange={setCorporateRegistry}
-                      fileType="corporate_registry"
-                      accept="image/*,.pdf"
-                      required
-                    />
-                    <p className="text-sm text-muted-foreground">
-                      発行から3ヶ月以内のものをご用意ください
+                <div className="space-y-4">
+                  <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                    <p className="text-sm text-blue-700">
+                      「本人確認を開始」ボタンを押すと、カメラが起動し身分証明書と顔写真の撮影を行います。
+                      スマートフォンでの操作を推奨します。
                     </p>
                   </div>
-                  <div className="space-y-4">
-                    <h4 className="font-medium">代表者身分証明書</h4>
-                    <div className="grid gap-4 sm:grid-cols-2">
-                      <FileUpload
-                        label="身分証明書（表面）"
-                        uploadedFile={idFront}
-                        onFileChange={setIdFront}
-                        fileType="id_front"
-                        required
-                      />
-                      <FileUpload
-                        label="身分証明書（裏面）"
-                        uploadedFile={idBack}
-                        onFileChange={setIdBack}
-                        fileType="id_back"
-                        required
-                      />
-                    </div>
-                  </div>
+                  <Button
+                    className="w-full h-12 text-lg"
+                    onClick={() => {
+                      // PIC手動起動
+                      if (typeof window !== "undefined" && (window as unknown as Record<string, unknown>).pic) {
+                        ((window as unknown as Record<string, unknown>).pic as { start: () => void }).start();
+                      }
+                    }}
+                  >
+                    本人確認を開始
+                  </Button>
                 </div>
               )}
 
-              <div className="space-y-4">
-                <h4 className="font-medium">身分証明書の有効期限</h4>
-                <div className="max-w-xs">
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant="outline"
-                        className={cn(
-                          "w-full justify-start text-left font-normal",
-                          !idExpiryDate && "text-muted-foreground"
-                        )}
-                      >
-                        <CalendarDays className="mr-2 h-4 w-4" />
-                        {idExpiryDate
-                          ? format(new Date(idExpiryDate), "yyyy年MM月dd日", { locale: ja })
-                          : "有効期限を選択"}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="start">
-                      <Calendar
-                        mode="single"
-                        selected={idExpiryDate ? new Date(idExpiryDate) : undefined}
-                        onSelect={(date) =>
-                          setIdExpiryDate(date ? format(date, "yyyy-MM-dd") : "")
-                        }
-                        startMonth={new Date()}
-                        endMonth={new Date(new Date().getFullYear() + 15, 11)}
-                        captionLayout="dropdown"
-                        locale={ja}
-                      />
-                    </PopoverContent>
-                  </Popover>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    運転免許証等の有効期限を入力してください
+              {/* 法人の場合：謄本アップロード */}
+              {customerType === "CORPORATE" && (
+                <div className="space-y-4">
+                  <h4 className="font-medium">法人確認書類</h4>
+                  <FileUpload
+                    label="登記簿謄本（履歴事項全部証明書）"
+                    uploadedFile={corporateRegistry}
+                    onFileChange={setCorporateRegistry}
+                    fileType="corporate_registry"
+                    accept="image/*,.pdf"
+                    required
+                  />
+                  <p className="text-sm text-muted-foreground">
+                    発行から6ヶ月以内のものをご用意ください
                   </p>
                 </div>
-              </div>
+              )}
 
               <div className="flex justify-between pt-4">
                 <Button variant="outline" onClick={() => setCurrentStep(2)}>
                   <ArrowLeft className="h-4 w-4 mr-2" />
                   戻る
                 </Button>
-                <Button onClick={() => setCurrentStep(4)} disabled={!canProceedStep3()}>
+                <Button
+                  onClick={() => setCurrentStep(4)}
+                  disabled={
+                    !kycCompleted ||
+                    (customerType === "CORPORATE" && !corporateRegistry)
+                  }
+                >
                   次へ
                   <ArrowRight className="h-4 w-4 ml-2" />
                 </Button>
