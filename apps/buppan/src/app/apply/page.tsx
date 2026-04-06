@@ -1163,7 +1163,10 @@ function ApplyPageInner() {
                   <ArrowLeft className="h-4 w-4 mr-2" />
                   戻る
                 </Button>
-                <Button onClick={() => setCurrentStep(3)} disabled={!canProceedStep2()}>
+                <Button onClick={() => {
+                  // PICのeKYCモーダルを起動するためにページ遷移（自動起動トリガー）
+                  window.location.href = "/apply?step=3";
+                }} disabled={!canProceedStep2()}>
                   次へ
                   <ArrowRight className="h-4 w-4 ml-2" />
                 </Button>
