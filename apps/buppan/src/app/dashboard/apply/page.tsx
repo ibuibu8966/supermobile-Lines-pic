@@ -77,7 +77,8 @@ function AdditionalApplyPageInner() {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const latestExpiry = kycImages
-      .map((img) => img.expiryDate)
+      .filter((img: { type: string }) => img.type !== "CORPORATE_REGISTRY")
+      .map((img: { expiryDate: string | null }) => img.expiryDate)
       .filter(Boolean)
       .sort()
       .at(-1);
@@ -85,12 +86,32 @@ function AdditionalApplyPageInner() {
     return new Date(latestExpiry) < today;
   })();
 
+  // 謄本の期限切れチェック（発行日+6ヶ月）
+  const isRegistryExpired = (() => {
+    const kycImages = dashboardData?.customer?.kycImages ?? [];
+    const registry = kycImages.find((img: { type: string }) => img.type === "CORPORATE_REGISTRY");
+    if (!registry) return false;
+    const issueDate = (registry as { issueDate?: string | null }).issueDate;
+    if (!issueDate) return false;
+    const expiry = new Date(issueDate);
+    expiry.setMonth(expiry.getMonth() + 6);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return expiry < today;
+  })();
+
+  const needsRenewal = isKycExpired || isRegistryExpired;
+
   const [step, setStep] = useState(1);
   const [kycCompleted, setKycCompleted] = useState(false);
   const [plans, setPlans] = useState<Plan[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // 謄本再提出
+  const [registryFile, setRegistryFile] = useState<File | null>(null);
+  const [registryIssueDate, setRegistryIssueDate] = useState("");
 
   // 住所入力（引っ越し対応）
   const [addressData, setAddressData] = useState({
@@ -143,26 +164,15 @@ function AdditionalApplyPageInner() {
   // dashboardData が読み込まれたら step を再設定
   useEffect(() => {
     if (dashboardData !== null && !kycCompleted) {
-      const kycImages = dashboardData?.customer?.kycImages ?? [];
-      if (kycImages.length > 0) {
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        const latestExpiry = kycImages
-          .map((img) => img.expiryDate)
-          .filter(Boolean)
-          .sort()
-          .at(-1);
-        const expired = !!latestExpiry && new Date(latestExpiry) < today;
-        if (expired) {
-          setStep(0);
-        }
+      if (needsRenewal) {
+        setStep(0);
       }
     }
-  }, [dashboardData, kycCompleted]);
+  }, [dashboardData, kycCompleted, needsRenewal]);
 
-  const steps = isKycExpired
+  const steps = needsRenewal
     ? [
-        { id: 0, name: "身分証更新" },
+        { id: 0, name: "本人確認・更新" },
         { id: 1, name: "プラン選択" },
         { id: 2, name: "確認・同意" },
       ]
@@ -317,7 +327,15 @@ function AdditionalApplyPageInner() {
     return unitPrice;
   };
 
-  const canProceedStep0 = () => kycCompleted && !!addressData.postalCode && !!addressData.prefecture && !!addressData.city && !!addressData.address;
+  const canProceedStep0 = () => {
+    // eKYCが必要な場合は完了必須
+    if (isKycExpired && !kycCompleted) return false;
+    // 住所は必須
+    if (!addressData.postalCode || !addressData.prefecture || !addressData.city || !addressData.address) return false;
+    // 謄本期限切れの場合は再提出必須
+    if (isRegistryExpired && (!registryFile || !registryIssueDate)) return false;
+    return true;
+  };
   const canProceedStep1 = () => selectedPlanId !== "" && lineCount >= 10 && lineCount % 10 === 0;
   const canSubmit = () => agreements.terms && agreements.privacy && agreements.cancellation;
 
@@ -572,6 +590,88 @@ function AdditionalApplyPageInner() {
                   </div>
                 </div>
               </div>
+
+              {/* 謄本再提出（期限切れ法人のみ） */}
+              {isRegistryExpired && (
+                <div className="space-y-4">
+                  <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg flex items-start gap-3">
+                    <AlertTriangle className="h-5 w-5 text-amber-600 mt-0.5 shrink-0" />
+                    <div>
+                      <p className="font-medium text-amber-800">登記簿謄本の有効期限が切れています</p>
+                      <p className="text-sm text-amber-700 mt-1">
+                        新しい登記簿謄本をアップロードしてください（発行から6ヶ月以内）。
+                      </p>
+                    </div>
+                  </div>
+                  <div>
+                    <Label className="text-sm font-medium">登記簿謄本 *</Label>
+                    <div className="mt-2">
+                      {registryFile ? (
+                        <div className="flex items-center gap-3 p-3 bg-green-50 border border-green-200 rounded-lg">
+                          <Check className="h-4 w-4 text-green-600" />
+                          <span className="text-sm text-green-700">{registryFile.name}</span>
+                          <button
+                            onClick={() => setRegistryFile(null)}
+                            className="ml-auto text-gray-400 hover:text-red-500"
+                          >
+                            <X className="h-4 w-4" />
+                          </button>
+                        </div>
+                      ) : (
+                        <label className="flex flex-col items-center justify-center w-full h-28 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-primary hover:bg-gray-50 transition-colors">
+                          <input
+                            type="file"
+                            accept="image/*,.pdf"
+                            className="hidden"
+                            onChange={(e) => setRegistryFile(e.target.files?.[0] ?? null)}
+                          />
+                          <div className="flex flex-col items-center gap-1 text-sm text-muted-foreground">
+                            <Upload className="h-5 w-5" />
+                            <span>クリックしてファイルを選択</span>
+                            <span className="text-xs">画像 または PDF</span>
+                          </div>
+                        </label>
+                      )}
+                    </div>
+                  </div>
+                  <div>
+                    <Label className="text-sm font-medium">謄本の発行日 *</Label>
+                    <div className="mt-2 max-w-xs">
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button
+                            variant="outline"
+                            className={cn(
+                              "w-full justify-start text-left font-normal",
+                              !registryIssueDate && "text-muted-foreground"
+                            )}
+                          >
+                            <CalendarDays className="mr-2 h-4 w-4" />
+                            {registryIssueDate
+                              ? format(new Date(registryIssueDate), "yyyy年MM月dd日", { locale: ja })
+                              : "発行日を選択"}
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="start">
+                          <Calendar
+                            mode="single"
+                            selected={registryIssueDate ? new Date(registryIssueDate) : undefined}
+                            onSelect={(date) =>
+                              setRegistryIssueDate(date ? format(date, "yyyy-MM-dd") : "")
+                            }
+                            endMonth={new Date()}
+                            captionLayout="dropdown"
+                            locale={ja}
+                          />
+                        </PopoverContent>
+                      </Popover>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        謄本に記載の発行日を入力してください
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 

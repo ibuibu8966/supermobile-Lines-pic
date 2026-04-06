@@ -272,6 +272,7 @@ function ApplyPageInner() {
   const [idBack, setIdBack] = useState<UploadedFile | null>(null);
   const [corporateRegistry, setCorporateRegistry] = useState<UploadedFile | null>(null);
   const [idExpiryDate, setIdExpiryDate] = useState("");
+  const [registryIssueDate, setRegistryIssueDate] = useState("");
 
   // メール重複チェック
   const [emailExists, setEmailExists] = useState(false);
@@ -542,6 +543,13 @@ function ApplyPageInner() {
       if (idBack) formData.append("idBackPath", idBack.storagePath);
       if (corporateRegistry) formData.append("corporateRegistryPath", corporateRegistry.storagePath);
       if (idExpiryDate) formData.append("idExpiryDate", idExpiryDate);
+      if (registryIssueDate) {
+        formData.append("registryIssueDate", registryIssueDate);
+        // 発行日+6ヶ月を謄本の有効期限として算出
+        const issueDate = new Date(registryIssueDate);
+        issueDate.setMonth(issueDate.getMonth() + 6);
+        formData.append("registryExpiryDate", format(issueDate, "yyyy-MM-dd"));
+      }
       if (couponApplied && couponCode) formData.append("couponCode", couponCode);
 
       const res = await fetch("/api/applications", {
@@ -1268,7 +1276,7 @@ function ApplyPageInner() {
                 </div>
               )}
 
-              {/* 法人の場合：謄本アップロード */}
+              {/* 法人の場合：謄本アップロード + 発行日 */}
               {customerType === "CORPORATE" && (
                 <div className="space-y-4">
                   <h4 className="font-medium">法人確認書類</h4>
@@ -1283,6 +1291,42 @@ function ApplyPageInner() {
                   <p className="text-sm text-muted-foreground">
                     発行から6ヶ月以内のものをご用意ください
                   </p>
+                  <div>
+                    <Label className="text-sm font-medium">謄本の発行日 *</Label>
+                    <div className="mt-2 max-w-xs">
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button
+                            variant="outline"
+                            className={cn(
+                              "w-full justify-start text-left font-normal",
+                              !registryIssueDate && "text-muted-foreground"
+                            )}
+                          >
+                            <CalendarDays className="mr-2 h-4 w-4" />
+                            {registryIssueDate
+                              ? format(new Date(registryIssueDate), "yyyy年MM月dd日", { locale: ja })
+                              : "発行日を選択"}
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="start">
+                          <Calendar
+                            mode="single"
+                            selected={registryIssueDate ? new Date(registryIssueDate) : undefined}
+                            onSelect={(date) =>
+                              setRegistryIssueDate(date ? format(date, "yyyy-MM-dd") : "")
+                            }
+                            endMonth={new Date()}
+                            captionLayout="dropdown"
+                            locale={ja}
+                          />
+                        </PopoverContent>
+                      </Popover>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        謄本に記載の発行日を入力してください（有効期限は発行日から6ヶ月です）
+                      </p>
+                    </div>
+                  </div>
                 </div>
               )}
 
@@ -1295,7 +1339,7 @@ function ApplyPageInner() {
                   onClick={() => setCurrentStep(4)}
                   disabled={
                     !kycCompleted ||
-                    (customerType === "CORPORATE" && !corporateRegistry)
+                    (customerType === "CORPORATE" && (!corporateRegistry || !registryIssueDate))
                   }
                 >
                   次へ

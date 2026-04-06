@@ -663,6 +663,8 @@ model KycImage {
 
   // 身分証明書の有効期限
   expiryDate DateTime?
+  // 書類の発行日（謄本等。発行日+6ヶ月=有効期限として運用）
+  issueDate  DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
