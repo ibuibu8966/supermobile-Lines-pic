@@ -1250,7 +1250,10 @@ function ApplyPageInner() {
                     className="w-full h-12 text-lg"
                     onClick={() => {
                       saveFormData();
-                      window.location.href = "/apply/ekyc";
+                      const sessionId = crypto.randomUUID();
+                      localStorage.setItem("ekycSessionId", sessionId);
+                      const email = encodeURIComponent(customerData.email);
+                      window.location.href = `/apply/ekyc?email=${email}&sessionId=${sessionId}`;
                     }}
                   >
                     本人確認を開始
