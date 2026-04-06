@@ -100,7 +100,10 @@ function AdditionalApplyPageInner() {
     return expiry < today;
   })();
 
-  const needsRenewal = isKycExpired || isRegistryExpired;
+  // eKYC未済チェック（過去にPICで本人確認していない場合）
+  const isEkycNotDone = dashboardData?.customer?.ekycCompleted === false;
+
+  const needsRenewal = isKycExpired || isRegistryExpired || isEkycNotDone;
 
   const [step, setStep] = useState(1);
   const [kycCompleted, setKycCompleted] = useState(false);
@@ -145,8 +148,14 @@ function AdditionalApplyPageInner() {
     const kycParam = searchParams.get("kyc");
     if (kycParam === "complete") {
       setKycCompleted(true);
-      // eKYC完了後はstep 1（プラン選択）に進む
       setStep(1);
+      // eKYC完了フラグをDBに保存
+      const sessionId = localStorage.getItem("ekycSessionId");
+      fetch("/api/customer/ekyc-complete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sessionId }),
+      }).catch(() => {});
       // localStorageから保存データを復元
       const saved = localStorage.getItem("additionalApplyData");
       if (saved) {

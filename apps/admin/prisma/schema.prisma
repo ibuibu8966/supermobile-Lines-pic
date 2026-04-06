@@ -410,6 +410,11 @@ model Customer {
   companyAddress    String?   @db.VarChar(200)
   companyBuilding   String?   @db.VarChar(200)
 
+  // eKYC（PIC）完了フラグ
+  ekycCompleted   Boolean   @default(false)
+  ekycCompletedAt DateTime?
+  ekycSessionId   String?   @db.VarChar(100)
+
   status CustomerStatus @default(ACTIVE)
   note   String?        @db.Text
 

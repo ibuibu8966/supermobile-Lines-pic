@@ -24,6 +24,7 @@ export class CustomerDashboardService {
         type: true,
         email: true,
         phone: true,
+        ekycCompleted: true,
         lastName: true,
         firstName: true,
         lastNameKana: true,
