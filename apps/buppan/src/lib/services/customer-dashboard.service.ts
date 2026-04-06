@@ -71,6 +71,7 @@ export class CustomerDashboardService {
                 type: true,
                 status: true,
                 expiryDate: true,
+                issueDate: true,
                 reviewedAt: true,
                 reviewNote: true,
               },
