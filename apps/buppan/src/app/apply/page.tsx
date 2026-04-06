@@ -901,103 +901,12 @@ function ApplyPageInner() {
                     </div>
                   </div>
 
-                  <h4 className="font-medium mt-4">代表者情報</h4>
-                  <div className="grid gap-4">
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <Label htmlFor="representativeLastName">姓 *</Label>
-                        <Input
-                          id="representativeLastName"
-                          placeholder="山田"
-                          value={customerData.representativeLastName}
-                          onChange={(e) => {
-                            const val = e.target.value;
-                            setCustomerData((prev) => ({
-                              ...prev,
-                              representativeLastName: val,
-                              ...(sameAsRepresentative ? { lastName: val } : {}),
-                            }));
-                          }}
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="representativeFirstName">名 *</Label>
-                        <Input
-                          id="representativeFirstName"
-                          placeholder="太郎"
-                          value={customerData.representativeFirstName}
-                          onChange={(e) => {
-                            const val = e.target.value;
-                            setCustomerData((prev) => ({
-                              ...prev,
-                              representativeFirstName: val,
-                              ...(sameAsRepresentative ? { firstName: val } : {}),
-                            }));
-                          }}
-                        />
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <Label htmlFor="representativeLastNameKana">セイ *</Label>
-                        <Input
-                          id="representativeLastNameKana"
-                          placeholder="ヤマダ"
-                          value={customerData.representativeLastNameKana}
-                          onChange={(e) => {
-                            const val = e.target.value;
-                            setCustomerData((prev) => ({
-                              ...prev,
-                              representativeLastNameKana: val,
-                              ...(sameAsRepresentative ? { lastNameKana: val } : {}),
-                            }));
-                          }}
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="representativeFirstNameKana">メイ *</Label>
-                        <Input
-                          id="representativeFirstNameKana"
-                          placeholder="タロウ"
-                          value={customerData.representativeFirstNameKana}
-                          onChange={(e) => {
-                            const val = e.target.value;
-                            setCustomerData((prev) => ({
-                              ...prev,
-                              representativeFirstNameKana: val,
-                              ...(sameAsRepresentative ? { firstNameKana: val } : {}),
-                            }));
-                          }}
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  <label className="flex items-center gap-2 mt-2">
-                    <Checkbox
-                      checked={sameAsRepresentative}
-                      onCheckedChange={(checked) => {
-                        const isChecked = checked === true;
-                        setSameAsRepresentative(isChecked);
-                        if (isChecked) {
-                          setCustomerData((prev) => ({
-                            ...prev,
-                            lastName: prev.representativeLastName,
-                            firstName: prev.representativeFirstName,
-                            lastNameKana: prev.representativeLastNameKana,
-                            firstNameKana: prev.representativeFirstNameKana,
-                          }));
-                        }
-                      }}
-                    />
-                    <span className="text-sm">担当者も代表者と同じ</span>
-                  </label>
                 </div>
               )}
 
               <div className="space-y-4">
                 <h4 className="font-medium">
-                  {customerType === "CORPORATE" ? "担当者情報" : "ご契約者情報"}
+                  {customerType === "CORPORATE" ? "代表者情報" : "ご契約者情報"}
                 </h4>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
@@ -1007,7 +916,6 @@ function ApplyPageInner() {
                       placeholder="山田"
                       value={customerData.lastName}
                       onChange={(e) => setCustomerData({ ...customerData, lastName: e.target.value })}
-                      disabled={sameAsRepresentative}
                     />
                   </div>
                   <div>
@@ -1017,7 +925,6 @@ function ApplyPageInner() {
                       placeholder="太郎"
                       value={customerData.firstName}
                       onChange={(e) => setCustomerData({ ...customerData, firstName: e.target.value })}
-                      disabled={sameAsRepresentative}
                     />
                   </div>
                 </div>
@@ -1029,7 +936,6 @@ function ApplyPageInner() {
                       placeholder="ヤマダ"
                       value={customerData.lastNameKana}
                       onChange={(e) => setCustomerData({ ...customerData, lastNameKana: e.target.value })}
-                      disabled={sameAsRepresentative}
                     />
                   </div>
                   <div>
@@ -1039,13 +945,12 @@ function ApplyPageInner() {
                       placeholder="タロウ"
                       value={customerData.firstNameKana}
                       onChange={(e) => setCustomerData({ ...customerData, firstNameKana: e.target.value })}
-                      disabled={sameAsRepresentative}
                     />
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <Label>生年月日 *</Label>
+                    <Label>{customerType === "CORPORATE" ? "代表者生年月日" : "生年月日"} *</Label>
                     <Popover>
                       <PopoverTrigger asChild>
                         <Button
@@ -1081,7 +986,7 @@ function ApplyPageInner() {
                     </Popover>
                   </div>
                   <div>
-                    <Label htmlFor="phone">電話番号 *</Label>
+                    <Label htmlFor="phone">{customerType === "CORPORATE" ? "代表者電話番号" : "電話番号"} *</Label>
                     <Input
                       id="phone"
                       placeholder="09012345678"
@@ -1112,7 +1017,7 @@ function ApplyPageInner() {
               </div>
 
               <div className="space-y-4">
-                <h4 className="font-medium">ご住所</h4>
+                <h4 className="font-medium">{customerType === "CORPORATE" ? "代表者住所" : "ご住所"}</h4>
                 <div className="grid grid-cols-3 gap-4">
                   <div>
                     <Label htmlFor="postalCode">郵便番号 *</Label>
