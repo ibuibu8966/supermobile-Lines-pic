@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
@@ -55,8 +55,19 @@ interface KycUploadFile {
   expiryDate: string | null;
 }
 
-export default function AdditionalApplyPage() {
+const prefectures = [
+  "北海道", "青森県", "岩手県", "宮城県", "秋田県", "山形県", "福島県",
+  "茨城県", "栃木県", "群馬県", "埼玉県", "千葉県", "東京都", "神奈川県",
+  "新潟県", "富山県", "石川県", "福井県", "山梨県", "長野県", "岐阜県",
+  "静岡県", "愛知県", "三重県", "滋賀県", "京都府", "大阪府", "兵庫県",
+  "奈良県", "和歌山県", "鳥取県", "島根県", "岡山県", "広島県", "山口県",
+  "徳島県", "香川県", "愛媛県", "高知県", "福岡県", "佐賀県", "長崎県",
+  "熊本県", "大分県", "宮崎県", "鹿児島県", "沖縄県",
+];
+
+function AdditionalApplyPageInner() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { data: dashboardData } = useDashboard();
 
   // KYC期限切れチェック（dashboardData が null の間は false）
@@ -75,17 +86,20 @@ export default function AdditionalApplyPage() {
   })();
 
   const [step, setStep] = useState(1);
+  const [kycCompleted, setKycCompleted] = useState(false);
   const [plans, setPlans] = useState<Plan[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // KYCアップロード状態
-  const [kycFiles, setKycFiles] = useState<KycUploadFile[]>([
-    { type: "ID_FRONT", file: null, path: null, uploading: false, uploaded: false, error: null, expiryDate: null },
-    { type: "ID_BACK", file: null, path: null, uploading: false, uploaded: false, error: null, expiryDate: null },
-  ]);
-  const [kycExpiryDate, setKycExpiryDate] = useState<string>("");
+  // 住所入力（引っ越し対応）
+  const [addressData, setAddressData] = useState({
+    postalCode: "",
+    prefecture: "",
+    city: "",
+    address: "",
+    building: "",
+  });
 
   // フォームデータ
   const [selectedPlanId, setSelectedPlanId] = useState<string>("");
@@ -105,9 +119,30 @@ export default function AdditionalApplyPage() {
   const [couponValidating, setCouponValidating] = useState(false);
   const [couponError, setCouponError] = useState<string | null>(null);
 
+  // URLクエリパラメータでeKYC完了を検知
+  useEffect(() => {
+    const kycParam = searchParams.get("kyc");
+    if (kycParam === "complete") {
+      setKycCompleted(true);
+      // eKYC完了後はstep 1（プラン選択）に進む
+      setStep(1);
+      // localStorageから保存データを復元
+      const saved = localStorage.getItem("additionalApplyData");
+      if (saved) {
+        try {
+          const data = JSON.parse(saved);
+          if (data.addressData) setAddressData(data.addressData);
+          if (data.selectedPlanId) setSelectedPlanId(data.selectedPlanId);
+          if (data.lineCount) setLineCount(data.lineCount);
+          localStorage.removeItem("additionalApplyData");
+        } catch {}
+      }
+    }
+  }, [searchParams]);
+
   // dashboardData が読み込まれたら step を再設定
   useEffect(() => {
-    if (dashboardData !== null) {
+    if (dashboardData !== null && !kycCompleted) {
       const kycImages = dashboardData?.customer?.kycImages ?? [];
       if (kycImages.length > 0) {
         const today = new Date();
@@ -123,7 +158,7 @@ export default function AdditionalApplyPage() {
         }
       }
     }
-  }, [dashboardData]);
+  }, [dashboardData, kycCompleted]);
 
   const steps = isKycExpired
     ? [
@@ -282,7 +317,7 @@ export default function AdditionalApplyPage() {
     return unitPrice;
   };
 
-  const canProceedStep0 = () => kycFiles.every((f) => f.uploaded) && !!kycExpiryDate;
+  const canProceedStep0 = () => kycCompleted && !!addressData.postalCode && !!addressData.prefecture && !!addressData.city && !!addressData.address;
   const canProceedStep1 = () => selectedPlanId !== "" && lineCount >= 10 && lineCount % 10 === 0;
   const canSubmit = () => agreements.terms && agreements.privacy && agreements.cancellation;
 
@@ -425,7 +460,7 @@ export default function AdditionalApplyPage() {
             </div>
           )}
 
-          {/* Step 0: 身分証アップロード（KYC期限切れ時のみ） */}
+          {/* Step 0: eKYC本人確認 + 住所入力（KYC期限切れ時のみ） */}
           {step === 0 && (
             <div className="space-y-6">
               <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg flex items-start gap-3">
@@ -433,102 +468,109 @@ export default function AdditionalApplyPage() {
                 <div>
                   <p className="font-medium text-amber-800">身分証明書の有効期限が切れています</p>
                   <p className="text-sm text-amber-700 mt-1">
-                    追加申込を行うには、有効な身分証明書の表面・裏面をアップロードしてください。
+                    追加申込を行うには、本人確認と現在の住所の入力が必要です。
                   </p>
                 </div>
               </div>
 
+              {/* eKYC 本人確認 */}
               <div className="space-y-4">
-                <div>
-                  <Label className="text-sm font-medium">
-                    新しい身分証明書の有効期限 *
-                  </Label>
-                  <div className="mt-2 max-w-xs">
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <Button
-                          variant="outline"
-                          className={cn(
-                            "w-full justify-start text-left font-normal",
-                            !kycExpiryDate && "text-muted-foreground"
-                          )}
-                        >
-                          <CalendarDays className="mr-2 h-4 w-4" />
-                          {kycExpiryDate
-                            ? format(new Date(kycExpiryDate), "yyyy年MM月dd日", { locale: ja })
-                            : "有効期限を選択"}
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0" align="start">
-                        <Calendar
-                          mode="single"
-                          selected={kycExpiryDate ? new Date(kycExpiryDate) : undefined}
-                          onSelect={(date) =>
-                            setKycExpiryDate(date ? format(date, "yyyy-MM-dd") : "")
-                          }
-                          startMonth={new Date()}
-                          endMonth={new Date(new Date().getFullYear() + 15, 11)}
-                          captionLayout="dropdown"
-                          locale={ja}
-                        />
-                      </PopoverContent>
-                    </Popover>
-                    <p className="text-sm text-muted-foreground mt-1">
-                      運転免許証等の有効期限を入力してください
-                    </p>
-                  </div>
-                </div>
-                {kycFiles.map((kycFile, index) => (
-                  <div key={kycFile.type}>
-                    <Label className="text-sm font-medium">
-                      身分証明書 {kycFile.type === "ID_FRONT" ? "表面" : "裏面"} *
-                    </Label>
-                    <div className="mt-2">
-                      {kycFile.uploaded ? (
-                        <div className="flex items-center gap-3 p-3 bg-green-50 border border-green-200 rounded-lg">
-                          <Check className="h-4 w-4 text-green-600" />
-                          <span className="text-sm text-green-700">
-                            {kycFile.file?.name ?? "アップロード済み"}
-                          </span>
-                          <button
-                            onClick={() => removeKycFile(index)}
-                            className="ml-auto text-gray-400 hover:text-red-500"
-                          >
-                            <X className="h-4 w-4" />
-                          </button>
-                        </div>
-                      ) : (
-                        <label className="flex flex-col items-center justify-center w-full h-28 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-primary hover:bg-gray-50 transition-colors">
-                          <input
-                            type="file"
-                            accept="image/*"
-                            className="hidden"
-                            disabled={kycFile.uploading}
-                            onChange={(e) => {
-                              const file = e.target.files?.[0];
-                              if (file) uploadKycFile(index, file);
-                            }}
-                          />
-                          {kycFile.uploading ? (
-                            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                              <Loader2 className="h-4 w-4 animate-spin" />
-                              アップロード中...
-                            </div>
-                          ) : (
-                            <div className="flex flex-col items-center gap-1 text-sm text-muted-foreground">
-                              <Upload className="h-5 w-5" />
-                              <span>クリックして画像を選択</span>
-                              <span className="text-xs">JPG, PNG など</span>
-                            </div>
-                          )}
-                        </label>
-                      )}
-                      {kycFile.error && (
-                        <p className="text-xs text-red-500 mt-1">{kycFile.error}</p>
-                      )}
+                <h4 className="font-medium">本人確認</h4>
+                {kycCompleted ? (
+                  <div className="p-4 bg-green-50 border border-green-200 rounded-lg flex items-center gap-3">
+                    <Check className="h-5 w-5 text-green-600" />
+                    <div>
+                      <p className="font-medium text-green-800">本人確認が完了しました</p>
+                      <p className="text-sm text-green-700 mt-1">
+                        eKYCによる本人確認が正常に完了しました。
+                      </p>
                     </div>
                   </div>
-                ))}
+                ) : (
+                  <div className="space-y-3">
+                    <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                      <p className="text-sm text-blue-700">
+                        「本人確認を開始」ボタンを押すと、カメラが起動し身分証明書と顔写真の撮影を行います。
+                        スマートフォンでの操作を推奨します。
+                      </p>
+                    </div>
+                    <Button
+                      className="w-full h-12 text-lg"
+                      onClick={() => {
+                        const email = dashboardData?.customer?.email ?? "";
+                        const sessionId = crypto.randomUUID();
+                        localStorage.setItem("ekycSessionId", sessionId);
+                        localStorage.setItem("ekycRedirect", "/dashboard/apply?kyc=complete");
+                        localStorage.setItem("additionalApplyData", JSON.stringify({
+                          addressData,
+                          selectedPlanId,
+                          lineCount,
+                        }));
+                        const encodedEmail = encodeURIComponent(email);
+                        window.location.href = `/apply/ekyc?email=${encodedEmail}&sessionId=${sessionId}`;
+                      }}
+                    >
+                      本人確認を開始
+                    </Button>
+                  </div>
+                )}
+              </div>
+
+              {/* 住所入力 */}
+              <div className="space-y-4">
+                <h4 className="font-medium">現在の住所</h4>
+                <p className="text-sm text-muted-foreground">引っ越し等で住所が変わった場合は、現在の住所を入力してください。</p>
+                <div className="grid gap-4">
+                  <div>
+                    <Label className="text-sm font-medium">郵便番号 *</Label>
+                    <Input
+                      className="mt-1 max-w-xs"
+                      placeholder="例：1234567"
+                      value={addressData.postalCode}
+                      onChange={(e) => setAddressData({ ...addressData, postalCode: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-sm font-medium">都道府県 *</Label>
+                    <select
+                      className="mt-1 w-full max-w-xs rounded-md border border-input bg-background px-3 py-2 text-sm"
+                      value={addressData.prefecture}
+                      onChange={(e) => setAddressData({ ...addressData, prefecture: e.target.value })}
+                    >
+                      <option value="">選択してください</option>
+                      {prefectures.map((p) => (
+                        <option key={p} value={p}>{p}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <Label className="text-sm font-medium">市区町村 *</Label>
+                    <Input
+                      className="mt-1"
+                      placeholder="例：渋谷区"
+                      value={addressData.city}
+                      onChange={(e) => setAddressData({ ...addressData, city: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-sm font-medium">番地 *</Label>
+                    <Input
+                      className="mt-1"
+                      placeholder="例：1-2-3"
+                      value={addressData.address}
+                      onChange={(e) => setAddressData({ ...addressData, address: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-sm font-medium">建物名・部屋番号</Label>
+                    <Input
+                      className="mt-1"
+                      placeholder="例：〇〇マンション101号室"
+                      value={addressData.building}
+                      onChange={(e) => setAddressData({ ...addressData, building: e.target.value })}
+                    />
+                  </div>
+                </div>
               </div>
             </div>
           )}
@@ -839,5 +881,13 @@ export default function AdditionalApplyPage() {
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+export default function AdditionalApplyPage() {
+  return (
+    <Suspense fallback={<div className="flex items-center justify-center py-12"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>}>
+      <AdditionalApplyPageInner />
+    </Suspense>
   );
 }

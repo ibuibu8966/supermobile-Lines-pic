@@ -359,17 +359,24 @@ function ApplyPageInner() {
 
   // URLクエリパラメータでPIC完了後のリダイレクトを処理
   useEffect(() => {
-    const stepParam = searchParams.get("step");
     const kycParam = searchParams.get("kyc");
+    if (kycParam === "complete") {
+      // 追加申込からのeKYCの場合、追加申込ページにリダイレクト
+      const ekycRedirect = localStorage.getItem("ekycRedirect");
+      if (ekycRedirect) {
+        localStorage.removeItem("ekycRedirect");
+        window.location.href = ekycRedirect;
+        return;
+      }
+      setKycCompleted(true);
+      restoreFormData();
+    }
+    const stepParam = searchParams.get("step");
     if (stepParam) {
       const stepNum = parseInt(stepParam, 10);
       if (stepNum >= 1 && stepNum <= 5) {
         setCurrentStep(stepNum);
       }
-    }
-    if (kycParam === "complete") {
-      setKycCompleted(true);
-      restoreFormData();
     }
   }, [searchParams]);
 
