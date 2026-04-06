@@ -1,0 +1,61 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* BUPPAN Gold/Luxury Theme - Dark by default */
+    --background: 0 0% 4%; /* #0a0a0a */
+    --foreground: 0 0% 100%; /* white */
+    --card: 0 0% 7%; /* slightly elevated */
+    --card-foreground: 0 0% 100%;
+    --popover: 0 0% 7%;
+    --popover-foreground: 0 0% 100%;
+    --primary: 43 72% 52%; /* #d4af37 gold */
+    --primary-foreground: 0 0% 0%;
+    --secondary: 48 80% 70%; /* #f0d970 light gold */
+    --secondary-foreground: 0 0% 0%;
+    --muted: 0 0% 15%;
+    --muted-foreground: 0 0% 65%;
+    --accent: 43 72% 52%; /* gold */
+    --accent-foreground: 0 0% 0%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 0 0% 20%;
+    --input: 0 0% 20%;
+    --ring: 43 72% 52%; /* gold */
+    --radius: 0.5rem;
+
+    /* Custom gold colors */
+    --gold: #d4af37;
+    --gold-light: #f0d970;
+    --gold-dark: #b8941f;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+@layer utilities {
+  .text-gold {
+    color: var(--gold);
+  }
+  .text-gold-light {
+    color: var(--gold-light);
+  }
+  .bg-gold {
+    background-color: var(--gold);
+  }
+  .bg-gold-gradient {
+    background: linear-gradient(135deg, var(--gold) 0%, var(--gold-light) 100%);
+  }
+  .border-gold {
+    border-color: var(--gold);
+  }
+}

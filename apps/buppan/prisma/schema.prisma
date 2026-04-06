@@ -1,0 +1,718 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "rhel-openssl-3.0.x"]
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ==================== ENUMS ====================
+
+enum SimType {
+  INDIVIDUAL // 個人回線
+  CORPORATE // 法人回線
+  BOTH // 両方
+}
+
+enum CarrierType {
+  DOCOMO
+  AU
+  SOFTBANK
+  RAKUTEN
+}
+
+enum ContractStatus {
+  PENDING // 準備中
+  SHIPPED // 発送済み
+  ACTIVE // 利用中
+  ENDED // 契約終了
+  CANCELLED // キャンセル
+}
+
+enum CustomerType {
+  INDIVIDUAL // 個人
+  CORPORATE // 法人
+}
+
+enum CustomerStatus {
+  ACTIVE
+  SUSPENDED
+  DELETED
+}
+
+enum UserRole {
+  CUSTOMER
+  EMPLOYEE
+  ADMIN
+  SUPER_ADMIN
+}
+
+enum ApplicationStatus {
+  SUBMITTED // 申込済み
+  PAYMENT_PENDING // 入金待ち
+  PAID // 入金済み
+  SHIPPING // 発送中
+  COMPLETED // 完了
+  CANCELLED // キャンセル
+}
+
+enum ApplicationLineStatus {
+  NOT_ACTIVATED // 未開通
+  ACTIVATED // 開通済み
+  SHIPPED // 発送済み
+  RETURNED // 返却済み
+  CANCELLED // 解約
+  SHIPPING_INSTRUCTED // 発送指示済み
+}
+
+enum PaymentStatus {
+  BEFORE_INVOICE // 請求書発行前
+  INVOICED // 請求書発行済み
+  PAID // 入金済み
+}
+
+enum KycImageType {
+  ID_FRONT // 身分証（表）- 個人の免許証、法人代表者の身分証
+  ID_BACK // 身分証（裏）
+  SELFIE // 自撮り（任意）
+  ADDRESS_PROOF // 住所証明（任意）
+  CORPORATE_REGISTRY // 登記簿謄本（法人用）
+}
+
+enum KycImageStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum KycVerificationStatus {
+  PENDING // 確認待ち
+  DEFICIENT // 不備
+  RESUBMIT // 再提出
+  COMPLETED // 完了
+}
+
+enum PurchaseOrderStatus {
+  ORDERED // 発注済（発注書作成）
+  CONFIRMED // 発注（先方受理）
+  AWAITING_SEAL // しぃさん印鑑待ち
+  BEFORE_PAYMENT // 振込前
+  AWAITING_DELIVERY // 納品待ち
+  DELIVERED // 納品済
+}
+
+enum PurchaseOrderType {
+  PURCHASE_ORDER // 発注
+  SUPPLIER_INVOICE // 請求
+  EXPENSE // 経費
+  CUSTOMER_INVOICE // 追加請求
+}
+
+enum SimplePaymentStatus {
+  UNPAID // 未払い
+  PAID // 支払済
+}
+
+// ==================== SIM管理 ====================
+
+model Supplier {
+  id        Int      @id @default(autoincrement())
+  code      String   @unique @db.VarChar(50)
+  name      String   @db.VarChar(100)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  sims           Sim[]
+  purchaseOrders PurchaseOrder[]
+
+  @@index([isActive])
+}
+
+model Sim {
+  iccid           String       @id @db.VarChar(20)
+  msisdn          String?      @db.VarChar(20)
+  supplierId      Int
+  purchaseOrderId String?      @db.VarChar(30)
+  simType         SimType      @default(INDIVIDUAL)
+  carrierType     CarrierType?
+  plan            String?      @db.VarChar(100)
+
+  // 仕入れ先契約期間
+  supplierContractStart DateTime?
+  supplierContractEnd   DateTime?
+
+  // 自動解約
+  isAutoCancel   Boolean   @default(false)
+  autoCancelDate DateTime?
+
+  // 現在の状態
+  currentContractId String? @db.VarChar(30)
+
+  // 消費済み用途タグ（高速検索用）
+  consumedTagIds Int[] @default([])
+  // 利用可能な用途タグ
+  eligibleTagIds Int[] @default([])
+
+  // SIMの場所
+  simLocationTagId Int?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  supplier         Supplier          @relation(fields: [supplierId], references: [id])
+  purchaseOrder    PurchaseOrder?    @relation(fields: [purchaseOrderId], references: [id])
+  simLocationTag   SimLocationTag?   @relation(fields: [simLocationTagId], references: [id])
+  contracts        Contract[]
+  applicationLines ApplicationLine[]
+
+  @@index([supplierId])
+  @@index([purchaseOrderId])
+  @@index([msisdn])
+  @@index([simType])
+  @@index([carrierType])
+  @@index([simLocationTagId])
+}
+
+model Contract {
+  id          String  @id @default(cuid())
+  iccid       String  @db.VarChar(20)
+  serviceName String  @db.VarChar(50)
+  customerId  String?
+
+  contractStart DateTime?
+  contractEnd   DateTime?
+  status        ContractStatus @default(PENDING)
+
+  shippedAt  DateTime?
+  arrivedAt  DateTime?
+  returnedAt DateTime?
+
+  msisdnSnapshot String? @db.VarChar(20)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  sim              Sim                @relation(fields: [iccid], references: [iccid], onDelete: Cascade)
+  customer         Customer?          @relation(fields: [customerId], references: [id])
+  usageTags        ContractUsageTag[]
+  applicationLines ApplicationLine[]
+
+  @@index([iccid])
+  @@index([serviceName])
+  @@index([customerId])
+  @@index([status])
+  @@index([contractStart, contractEnd])
+}
+
+model UsageTag {
+  id           Int     @id @default(autoincrement())
+  code         String  @unique @db.VarChar(50)
+  name         String  @db.VarChar(100)
+  category     String? @db.VarChar(50)
+  description  String? @db.Text
+  isActive     Boolean @default(true)
+  displayOrder Int     @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  contractTags ContractUsageTag[]
+  planTags     PlanUsageTag[]
+
+  @@index([isActive])
+  @@index([category])
+}
+
+model ContractUsageTag {
+  id         String   @id @default(cuid())
+  contractId String
+  usageTagId Int
+  appliedAt  DateTime @default(now())
+  note       String?  @db.Text
+
+  contract Contract @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  usageTag UsageTag @relation(fields: [usageTagId], references: [id], onDelete: Cascade)
+
+  @@unique([contractId, usageTagId])
+  @@index([usageTagId])
+  @@index([appliedAt])
+}
+
+// ==================== タグマスタ ====================
+
+model SimLocationTag {
+  id           Int      @id @default(autoincrement())
+  code         String   @unique @db.VarChar(50)
+  name         String   @db.VarChar(100)
+  isActive     Boolean  @default(true)
+  displayOrder Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  sims Sim[]
+
+  @@index([isActive])
+}
+
+model LineTag {
+  id           Int      @id @default(autoincrement())
+  code         String   @unique @db.VarChar(50)
+  name         String   @db.VarChar(100)
+  isActive     Boolean  @default(true)
+  displayOrder Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  applicationLines ApplicationLine[]
+
+  @@index([isActive])
+}
+
+model LineReserveTag {
+  id           Int      @id @default(autoincrement())
+  code         String   @unique @db.VarChar(50)
+  name         String   @db.VarChar(100)
+  isActive     Boolean  @default(true)
+  displayOrder Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  applicationLines ApplicationLine[]
+
+  @@index([isActive])
+}
+
+model ReferrerTag {
+  id           Int      @id @default(autoincrement())
+  code         String   @unique @db.VarChar(50)
+  name         String   @db.VarChar(100)
+  isActive     Boolean  @default(true)
+  displayOrder Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  customers Customer[]
+
+  @@index([isActive])
+}
+
+// ==================== サービス・顧客・申込 ====================
+
+model Service {
+  id        String   @id @default(cuid())
+  code      String   @unique @db.VarChar(50)
+  name      String   @db.VarChar(100)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  applications Application[]
+  plans        Plan[]
+  users        User[]
+
+  @@index([isActive])
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String?
+  password  String   @db.Text
+  role      UserRole @default(CUSTOMER)
+  serviceId String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  service             Service?             @relation(fields: [serviceId], references: [id])
+  customers           Customer[]
+  applications        Application[]
+  applicationComments ApplicationComment[]
+
+  @@index([role])
+  @@index([serviceId])
+  @@index([isActive])
+}
+
+model Customer {
+  id     String       @id @default(cuid())
+  userId String?
+  type   CustomerType @default(INDIVIDUAL)
+  email  String       @unique
+  phone  String       @db.VarChar(20)
+
+  // 個人情報
+  lastName      String    @db.VarChar(50)
+  firstName     String    @db.VarChar(50)
+  lastNameKana  String    @db.VarChar(50)
+  firstNameKana String    @db.VarChar(50)
+  birthDate     DateTime?
+  postalCode    String    @db.VarChar(10)
+  prefecture    String    @db.VarChar(20)
+  city          String    @db.VarChar(100)
+  address       String    @db.VarChar(200)
+  building      String?   @db.VarChar(200)
+
+  // 法人情報
+  companyName       String?   @db.VarChar(100)
+  companyNameKana   String?   @db.VarChar(100)
+  establishedDate   DateTime?
+  representativeLastName      String?   @db.VarChar(50)
+  representativeFirstName     String?   @db.VarChar(50)
+  representativeLastNameKana  String?   @db.VarChar(50)
+  representativeFirstNameKana String?   @db.VarChar(50)
+  companyPostalCode String?   @db.VarChar(10)
+  companyPrefecture String?   @db.VarChar(20)
+  companyCity       String?   @db.VarChar(100)
+  companyAddress    String?   @db.VarChar(200)
+  companyBuilding   String?   @db.VarChar(200)
+
+  status CustomerStatus @default(ACTIVE)
+  note   String?        @db.Text
+
+  referrerTagId Int?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user         User?         @relation(fields: [userId], references: [id])
+  referrerTag  ReferrerTag?  @relation(fields: [referrerTagId], references: [id])
+  applications Application[]
+  contracts    Contract[]
+
+  @@index([userId])
+  @@index([type])
+  @@index([status])
+  @@index([referrerTagId])
+}
+
+model Plan {
+  id          String   @id @default(cuid())
+  serviceId   String
+  code        String   @db.VarChar(50)
+  name        String   @db.VarChar(100)
+  description String?  @db.Text
+  features       String[] @default([])
+  lineIncrements Int[]    @default([10])
+  minLineCount   Int      @default(10)
+  isActive       Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  service      Service        @relation(fields: [serviceId], references: [id])
+  usageTags    PlanUsageTag[]
+  pricings     PlanPricing[]
+  applications Application[]
+  coupons      Coupon[]
+
+  @@unique([serviceId, code])
+  @@index([serviceId])
+  @@index([isActive])
+}
+
+model PlanUsageTag {
+  id         String   @id @default(cuid())
+  planId     String
+  usageTagId Int
+  createdAt  DateTime @default(now())
+
+  plan     Plan     @relation(fields: [planId], references: [id], onDelete: Cascade)
+  usageTag UsageTag @relation(fields: [usageTagId], references: [id], onDelete: Cascade)
+
+  @@unique([planId, usageTagId])
+  @@index([usageTagId])
+}
+
+model PlanPricing {
+  id          String   @id @default(cuid())
+  planId      String
+  minQuantity Int      @default(1)
+  maxQuantity Int?
+  unitPrice   Int
+  description String?  @db.VarChar(200)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  plan Plan @relation(fields: [planId], references: [id], onDelete: Cascade)
+
+  @@index([planId])
+}
+
+model Application {
+  id                String            @id @default(cuid())
+  applicationNumber String            @unique @db.VarChar(20)
+  customerId        String
+  serviceId         String
+  planId            String
+  lineCount         Int
+  unitPrice         Int
+  totalAmount       Int
+  status            ApplicationStatus @default(SUBMITTED)
+  paidAt            DateTime?
+  note              String?           @db.Text
+
+  // 独立した確認ステータス
+  kycStatus     KycVerificationStatus?
+  paymentStatus PaymentStatus?         @default(BEFORE_INVOICE)
+  addressStatus KycVerificationStatus?
+
+  // アーカイブ
+  isArchived Boolean   @default(false)
+  archivedAt DateTime?
+
+  // クーポン
+  couponId   String?
+  couponCode String? @db.VarChar(50)
+
+  // 管理用コメント
+  comment1 String? @db.Text
+  comment2 String? @db.Text
+
+  // 担当者・井上確認
+  inoueCheck     String? @default("IN_PROGRESS") @db.VarChar(20)
+  assignedUserId String?
+
+  // ワークフロー: ① キャッシュバック
+  noReferral Boolean @default(false)
+
+  // ワークフロー: ② 請求書
+  invoicePdfPath   String? @db.VarChar(500)
+  invoiceUrl       String? @db.VarChar(500)
+  invoiceEmailPath String? @db.VarChar(500)
+
+  // ワークフロー: ③ 入金確認
+  paymentImagePath String? @db.VarChar(500)
+
+  // ワークフロー: ④ 発送指示
+  shippingImagePath String? @db.VarChar(500)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  customer     Customer              @relation(fields: [customerId], references: [id])
+  service      Service               @relation(fields: [serviceId], references: [id])
+  plan         Plan                  @relation(fields: [planId], references: [id])
+  coupon       Coupon?               @relation(fields: [couponId], references: [id])
+  assignedUser User?                 @relation(fields: [assignedUserId], references: [id])
+  lines        ApplicationLine[]
+  kycImages    KycImage[]
+  referrals    ApplicationReferral[]
+  trackings    ApplicationTracking[]
+  comments     ApplicationComment[]
+
+  @@index([customerId])
+  @@index([serviceId])
+  @@index([planId])
+  @@index([couponId])
+  @@index([status])
+  @@index([createdAt])
+  @@index([isArchived])
+}
+
+model ApplicationReferral {
+  id            String   @id @default(cuid())
+  applicationId String
+  referrerName  String   @db.VarChar(100)
+  fee           Int
+  createdAt     DateTime @default(now())
+
+  application Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  @@index([applicationId])
+}
+
+model ApplicationTracking {
+  id             String   @id @default(cuid())
+  applicationId  String
+  carrier        String   @db.VarChar(50)
+  trackingNumber String   @db.VarChar(100)
+  createdAt      DateTime @default(now())
+
+  application Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  @@index([applicationId])
+}
+
+model Coupon {
+  id          String   @id @default(cuid())
+  code        String   @unique @db.VarChar(50)
+  planId      String
+  unitPrice   Int?
+  description String?  @db.VarChar(200)
+  maxUsages   Int?
+  usageCount  Int      @default(0)
+  validFrom   DateTime
+  validUntil  DateTime
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  plan         Plan            @relation(fields: [planId], references: [id])
+  applications Application[]
+  pricings     CouponPricing[]
+
+  @@index([code])
+  @@index([planId])
+  @@index([isActive])
+}
+
+model CouponPricing {
+  id          String   @id @default(cuid())
+  couponId    String
+  minQuantity Int      @default(1)
+  maxQuantity Int?
+  unitPrice   Int
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  coupon Coupon @relation(fields: [couponId], references: [id], onDelete: Cascade)
+
+  @@index([couponId])
+}
+
+model ApplicationLine {
+  id            String                @id @default(cuid())
+  applicationId String
+  lineNumber    Int
+  simId         String?               @db.VarChar(20)
+  contractId    String?
+  msisdn        String?               @db.VarChar(20)
+  status        ApplicationLineStatus @default(NOT_ACTIVATED)
+  shippedAt     DateTime?
+  returnedAt    DateTime?
+  note          String?               @db.Text
+
+  // 回線タグ
+  lineTagId        Int?
+  lineReserveTagId Int?
+  contractMonth    DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  application    Application     @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  sim            Sim?            @relation(fields: [simId], references: [iccid])
+  contract       Contract?       @relation(fields: [contractId], references: [id])
+  lineTag        LineTag?        @relation(fields: [lineTagId], references: [id])
+  lineReserveTag LineReserveTag? @relation(fields: [lineReserveTagId], references: [id])
+
+  @@unique([applicationId, lineNumber])
+  @@index([status, applicationId]) // 複合INDEX: dashboard query最適化
+  @@index([applicationId])
+  @@index([simId])
+  @@index([contractId])
+  @@index([status])
+  @@index([lineTagId])
+  @@index([lineReserveTagId])
+}
+
+model KycImage {
+  id            String         @id @default(cuid())
+  applicationId String
+  type          KycImageType
+  storagePath   String         @db.VarChar(500)
+  status        KycImageStatus @default(PENDING)
+  reviewedAt    DateTime?
+  reviewNote    String?        @db.Text
+
+  // 身分証明書の有効期限
+  expiryDate DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  application Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  @@index([applicationId])
+  @@index([status])
+}
+
+// ==================== 仕入れ管理 ====================
+
+model PurchaseOrder {
+  id          String              @id @default(cuid())
+  type        PurchaseOrderType   @default(PURCHASE_ORDER)
+  supplierId  Int?
+  totalAmount Int
+  status      PurchaseOrderStatus @default(ORDERED)
+
+  // 支払ステータス（請求/経費/追加請求用）
+  paymentStatus SimplePaymentStatus?
+  paidAt        DateTime?
+
+  // 追加請求の顧客名（自由入力）
+  customerName String? @db.VarChar(200)
+
+  // 日付
+  orderedAt      DateTime  @default(now())
+  invoiceDate    DateTime?
+  deliveryDate   DateTime?
+  paymentDueDate DateTime?
+
+  // 書類（画像パス）
+  purchaseOrderImagePath String? @db.VarChar(500)
+  quoteImagePath         String? @db.VarChar(500)
+  invoiceImagePath       String? @db.VarChar(500)
+
+  // 備考
+  note String? @db.Text
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // リレーション
+  supplier Supplier?           @relation(fields: [supplierId], references: [id])
+  lines    PurchaseOrderLine[]
+  sims     Sim[]
+
+  @@index([supplierId])
+  @@index([type])
+  @@index([status])
+  @@index([orderedAt])
+  @@index([deliveryDate])
+  @@index([paymentDueDate])
+  @@index([updatedAt])
+  @@index([type, paymentStatus])
+}
+
+model PurchaseOrderLine {
+  id              String       @id @default(cuid())
+  purchaseOrderId String
+  name            String?      @db.VarChar(200)
+  carrierType     CarrierType?
+  quantity        Int
+  unitPrice       Int
+  subtotal        Int
+  isIncludedInUnitCost Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // リレーション
+  purchaseOrder PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+
+  @@index([purchaseOrderId])
+  @@index([carrierType])
+}
+
+model ApplicationComment {
+  id            String   @id @default(cuid())
+  applicationId String
+  userId        String
+  body          String?  @db.Text
+  imageUrl      String?
+  createdAt     DateTime @default(now())
+
+  application Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  user        User        @relation(fields: [userId], references: [id])
+
+  @@index([applicationId])
+  @@index([createdAt])
+}
