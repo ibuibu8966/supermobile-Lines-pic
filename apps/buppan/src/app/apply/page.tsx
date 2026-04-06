@@ -1163,10 +1163,7 @@ function ApplyPageInner() {
                   <ArrowLeft className="h-4 w-4 mr-2" />
                   戻る
                 </Button>
-                <Button onClick={() => {
-                  // PICのeKYCモーダルを起動するためにページ遷移（自動起動トリガー）
-                  window.location.href = "/apply?step=3";
-                }} disabled={!canProceedStep2()}>
+                <Button onClick={() => setCurrentStep(3)} disabled={!canProceedStep2()}>
                   次へ
                   <ArrowRight className="h-4 w-4 ml-2" />
                 </Button>
@@ -1208,10 +1205,8 @@ function ApplyPageInner() {
                   <Button
                     className="w-full h-12 text-lg"
                     onClick={() => {
-                      // PIC手動起動
-                      if (typeof window !== "undefined" && (window as unknown as Record<string, unknown>).pic) {
-                        ((window as unknown as Record<string, unknown>).pic as { start: () => void }).start();
-                      }
+                      // PIC自動起動のためページをフルリロード
+                      window.location.href = "/apply?step=3&pic=launch";
                     }}
                   >
                     本人確認を開始
