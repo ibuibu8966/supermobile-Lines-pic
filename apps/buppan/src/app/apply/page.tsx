@@ -314,6 +314,49 @@ function ApplyPageInner() {
     companyBuilding: "",
   });
 
+  // フォームデータをlocalStorageに保存
+  const saveFormData = () => {
+    const data = {
+      selectedPlanId,
+      customerType,
+      lineCount,
+      activeIncrement,
+      customerData,
+      password,
+      passwordConfirm,
+      sameAsRepresentative,
+      couponCode,
+      couponApplied,
+      couponUnitPrice,
+      couponPricings,
+      couponDescription,
+    };
+    localStorage.setItem("applyFormData", JSON.stringify(data));
+  };
+
+  // localStorageからフォームデータを復元
+  const restoreFormData = () => {
+    const saved = localStorage.getItem("applyFormData");
+    if (!saved) return;
+    try {
+      const data = JSON.parse(saved);
+      if (data.selectedPlanId) setSelectedPlanId(data.selectedPlanId);
+      if (data.customerType) setCustomerType(data.customerType);
+      if (data.lineCount) setLineCount(data.lineCount);
+      if (data.activeIncrement) setActiveIncrement(data.activeIncrement);
+      if (data.customerData) setCustomerData(data.customerData);
+      if (data.password) setPassword(data.password);
+      if (data.passwordConfirm) setPasswordConfirm(data.passwordConfirm);
+      if (data.sameAsRepresentative !== undefined) setSameAsRepresentative(data.sameAsRepresentative);
+      if (data.couponCode) setCouponCode(data.couponCode);
+      if (data.couponApplied) setCouponApplied(data.couponApplied);
+      if (data.couponUnitPrice !== undefined) setCouponUnitPrice(data.couponUnitPrice);
+      if (data.couponPricings) setCouponPricings(data.couponPricings);
+      if (data.couponDescription) setCouponDescription(data.couponDescription);
+      localStorage.removeItem("applyFormData");
+    } catch {}
+  };
+
   // URLクエリパラメータでPIC完了後のリダイレクトを処理
   useEffect(() => {
     const stepParam = searchParams.get("step");
@@ -326,6 +369,7 @@ function ApplyPageInner() {
     }
     if (kycParam === "complete") {
       setKycCompleted(true);
+      restoreFormData();
     }
   }, [searchParams]);
 
@@ -1205,8 +1249,8 @@ function ApplyPageInner() {
                   <Button
                     className="w-full h-12 text-lg"
                     onClick={() => {
-                      // PIC自動起動のためページをフルリロード
-                      window.location.href = "/apply?step=3&pic=launch";
+                      saveFormData();
+                      window.location.href = "/apply/ekyc";
                     }}
                   >
                     本人確認を開始
