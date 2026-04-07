@@ -488,48 +488,47 @@ export class ApplicationService {
     const applicationId = result.application.id;
     const timestamp = Date.now();
 
-    // ID表面
-    let resolvedIdFrontPath: string;
-    if (input.idFrontPath) {
-      // 既アップロード済みのパスを使用
-      resolvedIdFrontPath = input.idFrontPath;
-    } else if (input.idFront) {
-      resolvedIdFrontPath = `kyc/${applicationId}/id_front_${timestamp}`;
-      const idFrontBuffer = await this.fileToBuffer(input.idFront);
-      await uploadFileFn('kyc', resolvedIdFrontPath, idFrontBuffer, input.idFront.type);
-    } else {
-      throw new Error('ID表面が見つかりません');
+    // ID表面（PIC eKYCの場合は身分証画像がないのでスキップ）
+    if (input.idFrontPath || input.idFront) {
+      let resolvedIdFrontPath: string;
+      if (input.idFrontPath) {
+        resolvedIdFrontPath = input.idFrontPath;
+      } else {
+        resolvedIdFrontPath = `kyc/${applicationId}/id_front_${timestamp}`;
+        const idFrontBuffer = await this.fileToBuffer(input.idFront!);
+        await uploadFileFn('kyc', resolvedIdFrontPath, idFrontBuffer, input.idFront!.type);
+      }
+      await this.prisma.kycImage.create({
+        data: {
+          applicationId,
+          type: 'ID_FRONT',
+          storagePath: resolvedIdFrontPath,
+          status: 'PENDING',
+          expiryDate: input.idExpiryDate || null,
+        },
+      });
     }
-    await this.prisma.kycImage.create({
-      data: {
-        applicationId,
-        type: 'ID_FRONT',
-        storagePath: resolvedIdFrontPath,
-        status: 'PENDING',
-        expiryDate: input.idExpiryDate || null,
-      },
-    });
 
-    // ID裏面
-    let resolvedIdBackPath: string;
-    if (input.idBackPath) {
-      resolvedIdBackPath = input.idBackPath;
-    } else if (input.idBack) {
-      resolvedIdBackPath = `kyc/${applicationId}/id_back_${timestamp}`;
-      const idBackBuffer = await this.fileToBuffer(input.idBack);
-      await uploadFileFn('kyc', resolvedIdBackPath, idBackBuffer, input.idBack.type);
-    } else {
-      throw new Error('ID裏面が見つかりません');
+    // ID裏面（PIC eKYCの場合は身分証画像がないのでスキップ）
+    if (input.idBackPath || input.idBack) {
+      let resolvedIdBackPath: string;
+      if (input.idBackPath) {
+        resolvedIdBackPath = input.idBackPath;
+      } else {
+        resolvedIdBackPath = `kyc/${applicationId}/id_back_${timestamp}`;
+        const idBackBuffer = await this.fileToBuffer(input.idBack!);
+        await uploadFileFn('kyc', resolvedIdBackPath, idBackBuffer, input.idBack!.type);
+      }
+      await this.prisma.kycImage.create({
+        data: {
+          applicationId,
+          type: 'ID_BACK',
+          storagePath: resolvedIdBackPath,
+          status: 'PENDING',
+          expiryDate: input.idExpiryDate || null,
+        },
+      });
     }
-    await this.prisma.kycImage.create({
-      data: {
-        applicationId,
-        type: 'ID_BACK',
-        storagePath: resolvedIdBackPath,
-        status: 'PENDING',
-        expiryDate: input.idExpiryDate || null,
-      },
-    });
 
     // 登記簿謄本（法人のみ）
     if (input.corporateRegistryPath) {
