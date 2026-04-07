@@ -531,7 +531,17 @@ function ApplyPageInner() {
       formData.append("lineCount", lineCount.toString());
       formData.append("customerType", customerType);
       formData.append("password", password);
-      formData.append("customer", JSON.stringify(customerData));
+      // 法人の場合、担当者=代表者なので担当者データを代表者フィールドにもコピー
+      const customerPayload = customerType === "CORPORATE"
+        ? {
+            ...customerData,
+            representativeLastName: customerData.lastName,
+            representativeFirstName: customerData.firstName,
+            representativeLastNameKana: customerData.lastNameKana,
+            representativeFirstNameKana: customerData.firstNameKana,
+          }
+        : customerData;
+      formData.append("customer", JSON.stringify(customerPayload));
       formData.append("agreeTerms", agreeTerms.toString());
       formData.append("agreePrivacy", agreePrivacy.toString());
       formData.append("agreeTelecom", agreeTelecom.toString());
