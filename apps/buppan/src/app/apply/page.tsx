@@ -332,20 +332,26 @@ function ApplyPageInner() {
       couponPricings,
       couponDescription,
     };
+    console.log("[saveFormData] saving:", data);
     localStorage.setItem("applyFormData", JSON.stringify(data));
   };
 
   // localStorageからフォームデータを復元
   const restoreFormData = () => {
     const saved = localStorage.getItem("applyFormData");
+    console.log("[restoreFormData] saved raw:", saved);
     if (!saved) return;
     try {
       const data = JSON.parse(saved);
+      console.log("[restoreFormData] parsed:", data);
       if (data.selectedPlanId) setSelectedPlanId(data.selectedPlanId);
       if (data.customerType) setCustomerType(data.customerType);
       if (data.lineCount) setLineCount(data.lineCount);
       if (data.activeIncrement) setActiveIncrement(data.activeIncrement);
-      if (data.customerData) setCustomerData(data.customerData);
+      if (data.customerData) {
+        console.log("[restoreFormData] setting customerData:", data.customerData);
+        setCustomerData(data.customerData);
+      }
       if (data.password) setPassword(data.password);
       if (data.passwordConfirm) setPasswordConfirm(data.passwordConfirm);
       if (data.sameAsRepresentative !== undefined) setSameAsRepresentative(data.sameAsRepresentative);
@@ -355,7 +361,9 @@ function ApplyPageInner() {
       if (data.couponPricings) setCouponPricings(data.couponPricings);
       if (data.couponDescription) setCouponDescription(data.couponDescription);
       localStorage.removeItem("applyFormData");
-    } catch {}
+    } catch (e) {
+      console.error("[restoreFormData] error:", e);
+    }
   };
 
   // URLクエリパラメータでPIC完了後のリダイレクトを処理
