@@ -1470,8 +1470,8 @@ function ApplyPageInner() {
                     <div className="flex px-4 py-3">
                       <span className="w-36 text-sm text-muted-foreground shrink-0">代表者名</span>
                       <span className="text-sm">
-                        {customerData.representativeLastName} {customerData.representativeFirstName}
-                        {" "}({customerData.representativeLastNameKana} {customerData.representativeFirstNameKana})
+                        {customerData.lastName} {customerData.firstName}
+                        {" "}({customerData.lastNameKana} {customerData.firstNameKana})
                       </span>
                     </div>
                   </div>
