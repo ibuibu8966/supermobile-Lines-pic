@@ -1,17 +1,57 @@
 "use client";
 
 import Script from "next/script";
-import { useEffect } from "react";
-import { useRouter } from "next/navigation";
-import { Loader2 } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Loader2, Smartphone, Monitor } from "lucide-react";
 
 export default function EkycPage() {
-  const router = useRouter();
+  const [isMobile, setIsMobile] = useState<boolean | null>(null);
+  const [showQR, setShowQR] = useState(false);
 
-  // PIC完了後のリダイレクトで戻ってきた場合の処理は不要
-  // PICのリダイレクト先を /apply?step=4&kyc=complete に設定するため、
-  // このページには完了後に戻ってこない
+  useEffect(() => {
+    // モバイル判定
+    const mobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+    setIsMobile(mobile);
+    if (mobile) {
+      // スマホの場合は自動でPICを起動
+      setShowQR(true);
+    }
+  }, []);
 
+  // 判定中
+  if (isMobile === null) {
+    return (
+      <div className="min-h-screen bg-background text-foreground flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  // スマホの場合：PICが自動起動
+  if (isMobile) {
+    return (
+      <div className="min-h-screen bg-background text-foreground">
+        <header className="bg-card border-b">
+          <div className="max-w-3xl mx-auto px-4 py-4">
+            <h1 className="text-xl font-bold">本人確認</h1>
+          </div>
+        </header>
+        <main className="max-w-3xl mx-auto px-4 py-8">
+          <div className="text-center space-y-4">
+            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground mx-auto" />
+            <p className="text-muted-foreground">本人確認を起動中です...</p>
+          </div>
+        </main>
+        <Script
+          src="https://app.protechidchecker.com/apps/org7834"
+          strategy="afterInteractive"
+          charSet="utf-8"
+        />
+      </div>
+    );
+  }
+
+  // PCの場合：ボタンを表示 → クリックでQRコード表示
   return (
     <div className="min-h-screen bg-background text-foreground">
       <header className="bg-card border-b">
@@ -20,19 +60,41 @@ export default function EkycPage() {
         </div>
       </header>
       <main className="max-w-3xl mx-auto px-4 py-8">
-        <div className="text-center space-y-4">
-          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground mx-auto" />
-          <p className="text-muted-foreground">本人確認の準備中です...</p>
-          <p className="text-sm text-muted-foreground">
-            QRコードが表示されたら、スマートフォンで読み取ってください。
-          </p>
-        </div>
+        {!showQR ? (
+          <div className="max-w-md mx-auto space-y-6">
+            <div className="text-center space-y-2">
+              <Monitor className="h-12 w-12 text-muted-foreground mx-auto" />
+              <h2 className="text-lg font-semibold">PCからのご利用</h2>
+              <p className="text-sm text-muted-foreground">
+                本人確認にはスマートフォンのカメラが必要です。
+                QRコードを表示して、スマートフォンで読み取ってください。
+              </p>
+            </div>
+            <button
+              className="w-full flex items-center justify-center gap-3 h-14 text-lg font-medium rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
+              onClick={() => setShowQR(true)}
+            >
+              <Smartphone className="h-5 w-5" />
+              スマホで本人確認をする
+            </button>
+          </div>
+        ) : (
+          <div className="text-center space-y-4">
+            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground mx-auto" />
+            <p className="text-muted-foreground">QRコードを表示中です...</p>
+            <p className="text-sm text-muted-foreground">
+              表示されたQRコードをスマートフォンで読み取ってください。
+            </p>
+          </div>
+        )}
       </main>
-      <Script
-        src="https://app.protechidchecker.com/apps/org7834"
-        strategy="afterInteractive"
-        charSet="utf-8"
-      />
+      {showQR && (
+        <Script
+          src="https://app.protechidchecker.com/apps/org7834"
+          strategy="afterInteractive"
+          charSet="utf-8"
+        />
+      )}
     </div>
   );
 }
