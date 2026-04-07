@@ -304,12 +304,10 @@ export async function createCustomerApplication(
       throw new ValidationError('すべての同意事項にチェックしてください');
     }
 
-    // KYC書類チェック（FileオブジェクトまたはStorageパスのいずれかが必要）
+    // PIC eKYCで本人確認を行うため、身分証画像のアップロードは不要
+    // 身分証画像が添付された場合はそのまま処理する（後方互換性）
     const hasIdFront = !!idFront || !!idFrontPath;
     const hasIdBack = !!idBack || !!idBackPath;
-    if (!hasIdFront || !hasIdBack) {
-      throw new ValidationError('本人確認書類をアップロードしてください');
-    }
 
     const hasCorporateRegistry = !!corporateRegistry || !!corporateRegistryPath;
     if (customerType === 'CORPORATE' && !hasCorporateRegistry) {
