@@ -65,9 +65,12 @@ export default function EkycPage() {
             <div className="text-center space-y-2">
               <Monitor className="h-12 w-12 text-muted-foreground mx-auto" />
               <h2 className="text-lg font-semibold">PCからのご利用</h2>
-              <p className="text-sm text-muted-foreground">
+            </div>
+            <div className="p-4 bg-red-50 border border-red-200 rounded-lg text-center space-y-2">
+              <p className="font-medium text-red-800">対象外端末のため、ご利用頂けません。</p>
+              <p className="text-sm text-red-700">
                 本人確認にはスマートフォンのカメラが必要です。
-                QRコードを表示して、スマートフォンで読み取ってください。
+                下のボタンからQRコードを表示し、スマートフォンで読み取ってください。
               </p>
             </div>
             <button
