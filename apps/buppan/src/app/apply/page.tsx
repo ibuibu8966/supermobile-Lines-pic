@@ -1190,8 +1190,14 @@ function ApplyPageInner() {
                       saveFormData();
                       const sessionId = crypto.randomUUID();
                       localStorage.setItem("ekycSessionId", sessionId);
+                      // localStorageへの書き込みが確実に完了したか検証
+                      const verify = localStorage.getItem("applyFormData");
+                      console.log("[onClick] saved, verify:", verify ? "OK" : "FAILED");
                       const email = encodeURIComponent(customerData.email);
-                      window.location.href = `/apply/ekyc?email=${email}&sessionId=${sessionId}`;
+                      // setTimeout で書き込み完了を待ってから遷移
+                      setTimeout(() => {
+                        window.location.href = `/apply/ekyc?email=${email}&sessionId=${sessionId}`;
+                      }, 100);
                     }}
                   >
                     本人確認を開始
