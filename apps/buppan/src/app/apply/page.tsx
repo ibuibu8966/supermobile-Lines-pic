@@ -605,13 +605,13 @@ function ApplyPageInner() {
   };
 
   const canProceedStep3 = (): boolean => {
-    // KYC書類チェック
-    if (!idExpiryDate) return false;
-    if (customerType === "INDIVIDUAL") {
-      return idFront !== null && idBack !== null;
-    } else {
-      return idFront !== null && idBack !== null && corporateRegistry !== null;
+    // PIC eKYC完了チェック
+    if (!kycCompleted) return false;
+    // 法人の場合は謄本アップロード+発行日が必要
+    if (customerType === "CORPORATE") {
+      return corporateRegistry !== null && !!registryIssueDate;
     }
+    return true;
   };
 
   const getPasswordError = (): string | null => {
@@ -1570,11 +1570,15 @@ function ApplyPageInner() {
                   </div>
                 </div>
                 <div className="px-4 py-3 space-y-1">
+                  {kycCompleted && (
+                    <p className="text-sm text-green-700">・eKYC本人確認: 完了</p>
+                  )}
                   {customerType === "CORPORATE" && corporateRegistry && (
                     <p className="text-sm">・登記簿謄本: {corporateRegistry.file.name}</p>
                   )}
-                  {idFront && <p className="text-sm">・身分証明書（表）: {idFront.file.name}</p>}
-                  {idBack && <p className="text-sm">・身分証明書（裏）: {idBack.file.name}</p>}
+                  {customerType === "CORPORATE" && registryIssueDate && (
+                    <p className="text-sm">・謄本発行日: {registryIssueDate}</p>
+                  )}
                 </div>
               </div>
 
